@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	
+    <meta charset="UTF-8">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4743758553556526" crossorigin="anonymous"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-adsense-account" content="ca-pub-4743758553556526">
+    <title>Draw on Globe</title>
+
+    <style>
+            body, html {
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+                background-color: #bfbdbd;
+            }
+            canvas {
+                display: block;
+            }
+            #controls {
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+            }
+            button, input[type="range"], input[type="color"] {
+                padding: 5px 10px;
+                font-size: 12px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+            button.active {
+                background-color: #f44336;
+            }
+            #penSizeLabel {
+                background-color: #ffffff;
+                color: black;
+                padding: 3px 5px;
+                font-size: 12px;
+                border-radius: 5px;
+            }
+            #colorPicker {
+                width: 30px;
+                height: 30px;
+                border: none;
+                border-radius: 5px;
+                -webkit-appearance: none;
+                appearance: none;
+                background-color: #000000;
+            }
+            #colorPicker::-webkit-color-swatch-wrapper {
+                padding: 0;
+            }
+            #colorPicker::-webkit-color-swatch {
+                border: none;
+                border-radius: 5px;
+            }
+            #projectionModal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.5);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            #projectionModalContent {
+                background-color: white;
+                padding: 20px;
+                border-radius: 10px;
+                text-align: center;
+            }
+            #projectionModalContent button {
+                margin: 10px;
+            }
+            #buyMeACoffee {
+                position: fixed;
+                bottom: 10px;
+                left: 10px;
+            }
+            .hidden {
+                display: none;
+            }
+            /* Add this section for light grey labels */
+            #colorPicker + label,
+            #globeName + label {
+                color: #d3d3d3; /* Light grey color */
+            }
+            #emailInfo {
+                position: fixed;
+                bottom: 5px; /* Adjusted to be above the BuyMeACoffee button */
+                right: 5px;
+                font-size: 8px;
+                color: #001686;
+                background-color: rgba(255, 255, 255, 0.8);
+                padding: 0px;
+                border-radius: 0px;
+                text-align: center;
+                z-index: 0;
+            }
+
+            .emailInfo a {
+            	color: #007BFF; /* Link color */
+    		text-decoration: none;
+	    }
+
+	    .emailInfo a:hover {
+    		text-decoration: underline;
+            }
+
+          
+        	</style>
+</head>
+<body>
+    <canvas id="globe"></canvas>
+    <div id="controls">
+        <button id="drawButton">Draw</button>
+        <button id="fillButton">Fill</button>
+        <label for="colorPicker">Color:</label>
+        <input type="color" id="colorPicker" value="#000000">
+        <label id="penSizeLabel">Pen Size: <span id="penSizeValue">0.05</span></label>
+        <input type="range" id="penSizeSlider" min="0.01" max="0.50" step="0.01" value="0.05">
+        <button id="undoButton">Undo</button>
+        <button id="autorotateButton">Toggle Auto-Rotate</button>
+        <input type="range" id="rotationSpeed" min="-1" max="1" step="0.01" value="0.1">
+        <label for="globeName">Globe Name:</label>
+        <input type="text" id="globeName" maxlength="50" placeholder="Enter globe name">
+        <button id="saveButton">Save Globe File</button>
+        <input type="file" id="loadInput" accept=".json" style="display:none;">
+        <button id="loadButton">Load Globe File</button>
+        <input type="file" id="imageUpload" accept="image/*">
+        <button id="convertToMapButton">Convert to Map</button>
+    </div>
+
+    <div id="emailInfo">
+        <p>Questions or feedback, email me at <a href="mailto:admin@drawonglobe.com">admin@drawonglobe.com</a></p>
+    </div>
+
+    <div id="projectionModal" style="display: none;">
+        <div id="projectionModalContent">
+            <h2>Select Your Projection</h2>
+            <button id="mercatorProjectionButton">Mercator</button>
+            <button id="robinsonProjectionButton">Robinson</button>
+            <button id="closeModalButton">Close</button>
+        </div>
+    </div>
+
+    <div id="adContainer">
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4743758553556526"
+     		crossorigin="anonymous"></script>
+	<!-- draw -->
+	<ins class="adsbygoogle"
+     	style="display:block"
+     	data-ad-client="ca-pub-4743758553556526"
+     	data-ad-slot="3995865264"
+     	data-ad-format="auto"
+     	data-full-width-responsive="true"></ins>
+	<script>
+     	(adsbygoogle = window.adsbygoogle || []).push({});
+	</script>
+        </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4743758553556526"
+        crossorigin="anonymous"></script>
+    <script>
+        // Initialize scene, camera, and renderer
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('globe'), antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0xbfbdbd); // Dark gray color
+
+        // Add lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+        scene.add(ambientLight);
+
+        const pointLight1 = new THREE.PointLight(0xffffff, 0.6);
+        pointLight1.position.set(10, 10, 10);
+        scene.add(pointLight1);
+
+        const pointLight2 = new THREE.PointLight(0xffffff, 0.6);
+        pointLight2.position.set(-10, -10, -10);
+        scene.add(pointLight2);
+
+        // State Management
+        const history = [];
+        const maxHistoryLength = 250;
+
+        // Create the globe with higher resolution and a blank texture
+        const globeCanvas = document.createElement('canvas');
+        globeCanvas.width = 4096; // Increase resolution
+        globeCanvas.height = 2048;
+        const globeContext = globeCanvas.getContext('2d', { willReadFrequently: true });
+        globeContext.imageSmoothingEnabled = true;
+        globeContext.webkitImageSmoothingEnabled = true;
+        globeContext.mozImageSmoothingEnabled = true;
+        globeContext.msImageSmoothingEnabled = true;
+        globeContext.oImageSmoothingEnabled = true;
+        globeContext.fillStyle = '#888888'; // Set initial color
+        globeContext.fillRect(0, 0, globeCanvas.width, globeCanvas.height); // Fill canvas with color
+
+        const globeTexture = new THREE.CanvasTexture(globeCanvas);
+        globeTexture.wrapS = THREE.RepeatWrapping;
+        globeTexture.wrapT = THREE.RepeatWrapping;
+        globeTexture.minFilter = THREE.LinearFilter; // Use linear filter for minification
+        globeTexture.magFilter = THREE.LinearFilter; // Use linear filter for magnification 
+        const material = new THREE.MeshPhongMaterial({
+            map: globeTexture,
+            shininess: 30,
+            flatShading: false // Use smooth shading for better rendering
+        });
+        const geometry = new THREE.SphereGeometry(5, 128, 128); // Increase segments for better detail
+        const globe = new THREE.Mesh(geometry, material);
+        scene.add(globe);
+
+        // Set camera position
+        camera.position.z = 10;
+
+        // Add orbit controls
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enablePan = false;
+        controls.enableRotate = true;
+        controls.mouseButtons = {
+            LEFT: THREE.MOUSE.LEFT, // Drawing with left click
+            MIDDLE: THREE.MOUSE.MIDDLE,
+            RIGHT: THREE.MOUSE.RIGHT, // Rotate with right click
+        };
+
+        // Zoom constraints
+        const minZoom = 5;
+        const maxZoom = 15;
+
+        // Drawing variables
+        let isDrawing = false;
+        let drawEnabled = false;
+        let fillEnabled = false;
+        let drawColor = '#000000';
+        let penSize = 0.05;
+        let lastPoint = null;
+        let isFilling = false; // Flag to prevent concurrent fill operations
+
+        // Initialization debugging
+        console.log('Initialization complete');
+        console.log('Initial drawColor:', drawColor);
+        console.log('Initial penSize:', penSize);
+
+        //autorotate
+
+        let autoRotateEnabled = false;
+        let autoRotateSpeed = 0.1; // Default speed value
+
+        document.getElementById('autorotateButton').addEventListener('click', function() {
+            autoRotateEnabled = !autoRotateEnabled;
+            this.classList.toggle('active', autoRotateEnabled);
+            this.textContent = autoRotateEnabled ? 'Stop Auto-Rotate' : 'Toggle Auto-Rotate';
+        });
+
+        document.getElementById('rotationSpeed').addEventListener('input', function() {
+            autoRotateSpeed = parseFloat(this.value);
+        });
+
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (autoRotateEnabled) {
+                // Rotate the globe based on the speed slider
+                globe.rotation.y += autoRotateSpeed * 0.09; // Adjust the multiplier to change sensitivity
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Call the animate function to start the animation loop
+        animate();
+
+        document.getElementById('drawButton').addEventListener('click', function() {
+            saveState();
+            drawEnabled = !drawEnabled;
+            if (drawEnabled) {
+                fillEnabled = false;
+                document.getElementById('fillButton').classList.remove('active');
+                document.getElementById('fillButton').textContent = 'Fill';
+                toggleUIVisibility(true, 'drawButton');
+            } else {
+                toggleUIVisibility(false);
+            }
+            this.classList.toggle('active', drawEnabled);
+            this.textContent = drawEnabled ? 'Stop Drawing' : 'Draw';
+            controls.enabled = !drawEnabled;
+        });
+
+        document.getElementById('fillButton').addEventListener('click', function() {
+            saveState();
+            fillEnabled = !fillEnabled;
+            if (fillEnabled) {
+                drawEnabled = false;
+                document.getElementById('drawButton').classList.remove('active');
+                document.getElementById('drawButton').textContent = 'Draw';
+                toggleUIVisibility(true, 'fillButton');
+            } else {
+                toggleUIVisibility(false);
+            }
+            this.classList.toggle('active', fillEnabled);
+            this.textContent = fillEnabled ? 'Stop Filling (Note: Fill Takes 5-10 Seconds)' : 'Fill';
+            controls.enabled = !fillEnabled;
+        });
+
+        document.getElementById('colorPicker').addEventListener('input', function() {
+                drawColor = this.value;
+                this.style.backgroundColor = this.value; // Make the entire button the selected color
+            });
+
+        document.getElementById('penSizeSlider').addEventListener('input', function() {
+            penSize = parseFloat(this.value);
+            document.getElementById('penSizeValue').textContent = penSize.toFixed(2);
+        });
+
+        document.getElementById('convertToMapButton').addEventListener('click', function() {
+            document.getElementById('projectionModal').style.display = 'flex';
+        });
+
+        document.getElementById('closeModalButton').addEventListener('click', function() {
+            document.getElementById('projectionModal').style.display = 'none';
+        });
+
+        function convertToProjection(projectionType) {
+            const projectionCanvas = document.createElement('canvas');
+            projectionCanvas.width = 4096; // Increase resolution
+            projectionCanvas.height = 2048;
+            const projectionContext = projectionCanvas.getContext('2d');
+
+            projectionContext.drawImage(globeCanvas, 0, 0, projectionCanvas.width, projectionCanvas.height);
+
+            switch (projectionType) {
+                case 'mercator':
+                    // Mercator projection logic (default)
+                    break;
+                case 'robinson':
+                    applyRobinsonProjection(projectionContext, projectionCanvas);
+                    break;
+            }
+
+            const globeName = document.getElementById('globeName').value.trim() || 'map';
+
+            const link = document.createElement('a');
+            link.href = projectionCanvas.toDataURL('image/png');
+            link.download = globeName + '.png';
+            link.click();
+
+            document.getElementById('projectionModal').style.display = 'none';
+        }
+
+        function latLongToUV(latitude, longitude) {
+            // Map longitude linearly from [-180, 180] to [0, 1]
+            let u = (longitude + 180) / 360;
+
+            // Compress the latitude mapping near the poles
+            let v = (Math.sin(latitude * Math.PI / 180) + 1) / 2;
+
+            return { u, v };
+        }
+
+
+        function applyRobinsonProjection(context, canvas) {
+            const width = canvas.width;
+            const height = canvas.height;
+            const imgData = context.getImageData(0, 0, width, height);
+            const data = imgData.data;
+
+            const projectedCanvas = document.createElement('canvas');
+            projectedCanvas.width = width;
+            projectedCanvas.height = height;
+            const projectedContext = projectedCanvas.getContext('2d');
+            const projectedImgData = projectedContext.createImageData(width, height);
+            const projectedData = projectedImgData.data;
+
+            const X = [1, 0.9986, 0.9954, 0.99, 0.9822, 0.973, 0.96, 0.9427, 0.9216, 0.8962, 0.8679, 0.835, 0.7986, 0.7597, 0.7186, 0.6732, 0.6213, 0.5722, 0.5322, 0.5026];
+            const Y = [0, 0.062, 0.124, 0.186, 0.248, 0.31, 0.372, 0.434, 0.4958, 0.5571, 0.6176, 0.6769, 0.7346, 0.7903, 0.8435, 0.8936, 0.9394, 0.9761, 1.0, 1.0148];
+
+            function interpolate(value, range) {
+                const i = Math.floor(value * (range.length - 1));
+                const fraction = value * (range.length - 1) - i;
+                return range[i] * (1 - fraction) + range[i + 1] * fraction;
+            }
+
+            function robinsonProjection(lambda, phi) {
+                const absPhi = Math.abs(phi) / (Math.PI / 2);
+                const x = interpolate(absPhi, X);
+                const y = interpolate(absPhi, Y);
+                return [lambda * x / Math.PI, y * Math.sign(phi)];
+            }
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const lambda = (x / width) * 2 * Math.PI - Math.PI;
+                    const phi = Math.PI / 2 - (y / height) * Math.PI;
+
+                    const [xp, yp] = robinsonProjection(lambda, phi);
+
+                    const xCanvas = Math.round((xp + 1) / 2 * width);
+                    const yCanvas = Math.round((1 - yp) / 2 * height);
+
+                    if (xCanvas >= 0 && xCanvas < width && yCanvas >= 0 && yCanvas < height) {
+                        const index = (y * width + x) * 4;
+                        const projectedIndex = (yCanvas * width + xCanvas) * 4;
+
+                        projectedData[projectedIndex] = data[index];
+                        projectedData[projectedIndex + 1] = data[index + 1];
+                        projectedData[projectedIndex + 2] = data[index + 2];
+                        projectedData[projectedIndex + 3] = data[index + 3];
+                    }
+                }
+            }
+
+            projectedContext.putImageData(projectedImgData, 0, 0);
+            context.clearRect(0, 0, width, height);
+            context.drawImage(projectedCanvas, 0, 0, width, height);
+        }
+
+        document.getElementById('robinsonProjectionButton').addEventListener('click', function() {
+            convertToProjection('robinson'); // Correct the case here
+        });
+
+        document.getElementById('mercatorProjectionButton').addEventListener('click', function() {
+            convertToProjection('mercator');
+        });
+
+        function toggleUIVisibility(hide, exceptionId) {
+            const controls = document.getElementById('controls').children;
+            for (let control of controls) {
+                if (control.id !== exceptionId) {
+                    control.classList.toggle('hidden', hide);
+                }
+            }
+
+            // Ensure buyMeACoffee disappears when UI is hidden
+            const buyMeACoffee = document.getElementById('buyMeACoffee');
+            if (buyMeACoffee) {
+                buyMeACoffee.classList.toggle('hidden', hide);
+            }
+        }
+
+        
+
+        function resetDrawingAndFilling() {
+            drawEnabled = false;
+            fillEnabled = false;
+            isDrawing = false; // Ensure drawing state is also reset
+
+            // Reset button styles and text
+            const drawButton = document.getElementById('drawButton');
+            const fillButton = document.getElementById('fillButton');
+
+            drawButton.classList.remove('active');
+            drawButton.textContent = 'Draw';
+
+            fillButton.classList.remove('active');
+            fillButton.textContent = 'Fill';
+
+            // Re-enable controls
+            controls.enabled = true;
+        }
+
+        document.addEventListener('pointerdown', (event) => {
+            if ((drawEnabled || fillEnabled) && event.button === 0) {
+                isDrawing = true;
+                lastPoint = null;
+            }
+        });
+
+        document.addEventListener('pointerup', (event) => {
+            if (fillEnabled && event.button === 0) {
+                const mouse = new THREE.Vector2(
+                    (event.clientX / window.innerWidth) * 2 - 1,
+                    -(event.clientY / window.innerHeight) * 2 + 1
+                );
+
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(mouse, camera);
+
+                const intersects = raycaster.intersectObject(globe);
+
+                if (intersects.length > 0 && !isFilling) {
+                    isFilling = true;
+                    const intersect = intersects[0];
+                    const uv = intersect.uv;
+                    uv.x *= globeCanvas.width;
+                    uv.y = (1 - uv.y) * globeCanvas.height;  // Correctly invert the y-coordinate
+
+                    fillCanvas(Math.floor(uv.x), Math.floor(uv.y), drawColor);
+                    isFilling = false; // Reset the flag after fill operation
+                }
+            }
+            isDrawing = false;
+            lastPoint = null;
+        });
+
+        document.addEventListener('pointermove', throttle((event) => {
+            if (!isDrawing || !drawEnabled) return;
+
+            const mouse = new THREE.Vector2(
+                (event.clientX / window.innerWidth) * 2 - 1,
+                -(event.clientY / window.innerHeight) * 2 + 1
+            );
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObject(globe);
+
+            if (intersects.length > 0) {
+                const intersect = intersects[0];
+
+                const uv = intersect.uv;
+                uv.x *= globeCanvas.width;
+                uv.y = (1 - uv.y) * globeCanvas.height;  // Correctly invert the y-coordinate
+
+                drawOnTexture(Math.floor(uv.x), Math.floor(uv.y), penSize, drawColor);
+            }
+        }, 40)); // Adjust the throttle delay to control the frequency
+
+        document.addEventListener('touchstart', function(event) {
+            if ((drawEnabled || fillEnabled) && event.target === renderer.domElement) {
+                event.preventDefault();  // Prevents default touch actions
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchend', function(event) {
+            if ((drawEnabled || fillEnabled) && event.target === renderer.domElement) {
+                event.preventDefault();  // Prevents default touch actions
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchmove', throttle(function(event) {
+            if ((drawEnabled || fillEnabled) && event.target === renderer.domElement) {
+                event.preventDefault();  // Prevents default touch actions
+            }
+        }, 40), { passive: false });
+        function throttle(func, limit) {
+            let inThrottle;
+            return function() {
+                const args = arguments;
+                const context = this;
+                if (!inThrottle) {
+                    func.apply(context, args);
+                    inThrottle = true;
+                    setTimeout(() => inThrottle = false, limit);
+                }
+            }
+        }
+
+        function throttle(func, limit) {
+            let inThrottle;
+            return function() {
+                const args = arguments;
+                const context = this;
+                if (!inThrottle) {
+                    func.apply(context, args);
+                    inThrottle = true;
+                    setTimeout(() => inThrottle = false, limit);
+                }
+            }
+        }
+
+        // Keyboard event listener for Ctrl + Z
+        document.addEventListener('keydown', function(event) {
+            if (event.ctrlKey && event.key === 'z') {
+                event.preventDefault(); // Prevent default Ctrl + Z action
+                undo(); // Call the undo function
+            }
+        });
+
+        // Function to capture the state of the globe
+        function captureGlobeState() {
+            return {
+                drawnPaths: globeCanvas.toDataURL(),
+                globeName: document.getElementById('globeName').value.trim() || 'map'
+            };
+        }
+
+        // Function to restore the state of the globe from a saved state
+        function restoreGlobeState(state) {
+            const img = new Image();
+            img.onload = function() {
+                globeContext.clearRect(0, 0, globeCanvas.width, globeCanvas.height);
+                globeContext.drawImage(img, 0, 0);
+                globeTexture.needsUpdate = true;
+            };
+            img.src = state.drawnPaths;
+            document.getElementById('globeName').value = state.globeName;
+        }
+
+        // Save button click event
+        document.getElementById('saveButton').addEventListener('click', function() {
+            const globeState = captureGlobeState();
+            const globeStateJson = JSON.stringify(globeState);
+            const blob = new Blob([globeStateJson], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = (globeState.globeName || 'globe') + '.json';
+            link.click();
+        });
+
+        // Load button click event
+        document.getElementById('loadButton').addEventListener('click', function() {
+            document.getElementById('loadInput').click();
+        });
+
+        // Load input change event
+        document.getElementById('loadInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const loadedState = JSON.parse(e.target.result);
+                    restoreGlobeState(loadedState);
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        //undo functionality
+        function captureState() {
+            return globeCanvas.toDataURL(); // Capture the current state as a Data URL
+        }
+
+        document.getElementById('undoButton').addEventListener('click', function() {
+            undo();
+        });
+
+
+        function restoreState(state) {
+            const img = new Image();
+            img.onload = function() {
+                globeContext.clearRect(0, 0, globeCanvas.width, globeCanvas.height); // Clear canvas
+                globeContext.drawImage(img, 0, 0); // Restore the state
+            };
+            img.src = state;
+        }
+
+        function saveState() {
+            if (history.length >= maxHistoryLength) {
+                history.shift(); // Remove oldest state if history is full
+            }
+            history.push(globeCanvas.toDataURL()); // Capture and save current state
+        }
+
+        function undo() {
+            if (history.length > 0) {
+                const prevState = history.pop(); // Get and remove the last saved state
+                const img = new Image();
+                img.onload = function() {
+                    globeContext.clearRect(0, 0, globeCanvas.width, globeCanvas.height); // Clear canvas
+                    globeContext.drawImage(img, 0, 0); // Restore previous state
+                    globeTexture.needsUpdate = true; // Update texture
+                };
+                img.src = prevState;
+            } else {
+                console.log("No more actions to undo.");
+            }
+        }
+
+        // drawing
+        function drawOnTexture(x, y, size, color) {
+            saveState(); // Save state before drawing
+
+            globeContext.fillStyle = color;
+            globeContext.strokeStyle = color;
+            globeContext.lineWidth = size * 50;
+            globeContext.lineCap = 'round';
+            globeContext.lineJoin = 'round';
+            //globeTexture.needsUpdate = true; // Update texture only when necessary
+
+            if (lastPoint) {
+                let startX = lastPoint.x % globeCanvas.width;
+                let startY = lastPoint.y % globeCanvas.height;
+                let endX = x % globeCanvas.width;
+                let endY = y % globeCanvas.height;
+
+                globeContext.beginPath();
+                globeContext.moveTo(startX, startY);
+
+                if (Math.abs(endX - startX) > globeCanvas.width / 2) {
+                    if (endX > startX) {
+                        endX -= globeCanvas.width;
+                    } else {
+                        endX += globeCanvas.width;
+                    }
+                }
+
+                globeContext.lineTo(endX, endY);
+                globeContext.stroke();
+            }
+
+            globeContext.beginPath();
+            globeContext.arc(x % globeCanvas.width, y % globeCanvas.height, size * 25, 0, Math.PI * 2, false);
+            globeContext.fill();
+
+            lastPoint = { x: x % globeCanvas.width, y: y % globeCanvas.height };
+
+            globeTexture.needsUpdate = true;
+        }
+
+        function fillCanvas(x, y, color) {
+            saveState(); // Save state before filling
+
+            const imageData = globeContext.getImageData(0, 0, globeCanvas.width, globeCanvas.height);
+            const data = imageData.data;
+            const targetColor = getPixelColor(data, x, y);
+            const fillColor = hexToRgb(color);
+
+            if (!colorsMatch(targetColor, fillColor)) {
+                floodFill(data, x, y, targetColor, fillColor);
+                expandFillArea(data, fillColor);
+
+                globeContext.putImageData(imageData, 0, 0);
+                globeTexture.needsUpdate = true;
+            }
+        }
+
+        function expandFillArea(data, fillColor) {
+            const width = globeCanvas.width;
+            const height = globeCanvas.height;
+            const expandedData = new Uint8ClampedArray(data);
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const index = (y * width + x) * 4;
+                    if (colorsMatch([data[index], data[index + 1], data[index + 2], data[index + 3]], fillColor)) {
+                        for (let dy = -1; dy <= 1; dy++) {
+                            for (let dx = -1; dx <= 1; dx++) {
+                                const nx = (x + dx + width) % width;
+                                const ny = (y + dy + height) % height;
+                                const nIndex = (ny * width + nx) * 4;
+                                expandedData[nIndex] = fillColor[0];
+                                expandedData[nIndex + 1] = fillColor[1];
+                                expandedData[nIndex + 2] = fillColor[2];
+                                expandedData[nIndex + 3] = 255;
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (let i = 0; i < data.length; i++) {
+                data[i] = expandedData[i];
+            }
+
+            const imageData = globeContext.getImageData(0, 0, globeCanvas.width, globeCanvas.height);
+            applyGaussianBlur(imageData);
+            globeContext.putImageData(imageData, 0, 0);
+        }
+
+        function drawThickBoundary(x, y, targetColor) {
+            const boundaryThickness = 2; // Adjust this value as needed
+            const halfThickness = Math.floor(boundaryThickness / 2);
+
+            const imageData = globeContext.getImageData(0, 0, globeCanvas.width, globeCanvas.height);
+            const data = imageData.data;
+
+            // Iterate over a small area around the (x, y) point to draw the thicker boundary
+            for (let i = -halfThickness; i <= halfThickness; i++) {
+                for (let j = -halfThickness; j <= halfThickness; j++) {
+                    const nx = (x + i + globeCanvas.width) % globeCanvas.width;
+                    const ny = (y + j + globeCanvas.height) % globeCanvas.height;
+                    if (colorsMatch(getPixelColor(data, nx, ny), targetColor)) {
+                        setPixelColor(data, nx, ny, targetColor);
+                    }
+                }
+            }
+
+            globeContext.putImageData(imageData, 0, 0);
+        }
+
+        function getPixelColor(data, x, y) {
+            const index = (y * globeCanvas.width + x) * 4;
+            return [data[index], data[index + 1], data[index + 2], data[index + 3]];
+        }
+
+        function colorsMatch(a, b) {
+            return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
+        }
+
+        function setPixelColor(data, x, y, color) {
+            const index = (y * globeCanvas.width + x) * 4;
+            data[index] = color[0];
+            data[index + 1] = color[1];
+            data[index + 2] = color[2];
+            data[index + 3] = 255;
+        }
+
+        function smoothLines(lines) {
+            if (lines.length < 3) return lines;
+
+            let smoothed = [];
+            smoothed.push(lines[0]); // Start with the first point
+
+            for (let i = 1; i < lines.length - 1; i++) {
+                let p0 = lines[i - 1];
+                let p1 = lines[i];
+                let p2 = lines[i + 1];
+
+                let c1 = {
+                    x: (p0.x + p1.x) / 2,
+                    y: (p0.y + p1.y) / 2,
+                };
+                let c2 = {
+                    x: (p1.x + p2.x) / 2,
+                    y: (p1.y + p2.y) / 2,
+                };
+
+                smoothed.push(c1);
+                smoothed.push(p1);
+                smoothed.push(c2);
+            }
+
+            smoothed.push(lines[lines.length - 1]); // End with the last point
+            return smoothed;
+        }
+
+        function hexToRgb(hex) {
+            const bigint = parseInt(hex.slice(1), 16);
+            return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+        }
+
+        function floodFill(data, x, y, targetColor, fillColor) {
+            const stack = [[x, y]];
+            const width = globeCanvas.width;
+            const height = globeCanvas.height;
+            const visited = new Set();
+
+            while (stack.length) {
+                const [x, y] = stack.pop();
+
+                let currentX = x;
+                let currentY = y;
+                let index = (currentY * width + currentX) * 4;
+
+                // Move to the leftmost pixel in the scanline
+                while (currentX >= 0 && colorsMatch(getPixelColor(data, currentX, currentY), targetColor)) {
+                    currentX--;
+                }
+                currentX++;
+
+                let reachAbove = false;
+                let reachBelow = false;
+
+                // Fill the entire scanline
+                while (currentX < width && colorsMatch(getPixelColor(data, currentX, currentY), targetColor)) {
+                    setPixelColor(data, currentX, currentY, fillColor);
+                    visited.add(currentY * width + currentX);
+
+                    if (currentY > 0) {
+                        if (colorsMatch(getPixelColor(data, currentX, currentY - 1), targetColor) && !reachAbove) {
+                            stack.push([currentX, currentY - 1]);
+                            reachAbove = true;
+                        } else if (!colorsMatch(getPixelColor(data, currentX, currentY - 1), targetColor)) {
+                            reachAbove = false;
+                        }
+                    }
+
+                    if (currentY < height - 1) {
+                        if (colorsMatch(getPixelColor(data, currentX, currentY + 1), targetColor) && !reachBelow) {
+                            stack.push([currentX, currentY + 1]);
+                            reachBelow = true;
+                        } else if (!colorsMatch(getPixelColor(data, currentX, currentY + 1), targetColor)) {
+                            reachBelow = false;
+                        }
+                    }
+
+                    currentX++;
+                }
+            }
+        }
+
+        function applyGaussianBlur(imageData) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+
+            const kernel = [
+                [1, 4, 7, 4, 1],
+                [4, 16, 26, 16, 4],
+                [7, 26, 41, 26, 7],
+                [4, 16, 26, 16, 4],
+                [1, 4, 7, 4, 1]
+            ];
+
+            const kernelSize = 5;
+            const kernelSum = 273;
+
+            const blurredData = new Uint8ClampedArray(data.length);
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    let r = 0, g = 0, b = 0, a = 0;
+                    for (let ky = -2; ky <= 2; ky++) {
+                        for (let kx = -2; kx <= 2; kx++) {
+                            const px = (x + kx + width) % width;
+                            const py = (y + ky + height) % height;
+                            const index = (py * width + px) * 4;
+                            const weight = kernel[ky + 2][kx + 2];
+                            r += data[index] * weight;
+                            g += data[index + 1] * weight;
+                            b += data[index + 2] * weight;
+                            a += data[index + 3] * weight;
+                        }
+                    }
+                    const newIndex = (y * width + x) * 4;
+                    blurredData[newIndex] = r / kernelSum;
+                    blurredData[newIndex + 1] = g / kernelSum;
+                    blurredData[newIndex + 2] = b / kernelSum;
+                    blurredData[newIndex + 3] = a / kernelSum;
+                }
+            }
+
+            for (let i = 0; i < data.length; i++) {
+                data[i] = blurredData[i];
+            }
+        }
+
+        //image upload
+
+        document.getElementById('imageUpload').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        // Draw the image on the globe texture
+                        globeContext.clearRect(0, 0, globeCanvas.width, globeCanvas.height); // Clear the canvas
+                        globeContext.drawImage(img, 0, 0, globeCanvas.width, globeCanvas.height); // Draw the image
+                        globeTexture.needsUpdate = true; // Update the texture on the globe
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        //desktop ads
+            document.addEventListener('DOMContentLoaded', function() {
+                if (window.innerWidth >= 768) {
+                    var adScript = document.createElement('script');
+                    adScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
+                    adScript.async = true;
+                    document.head.appendChild(adScript);
+
+                    (adsbygoogle = window.adsbygoogle || []).push({});
+                }
+            });
+    </script>
+    <div id="buyMeACoffee">
+        <a href="https://buymeacoffee.com/rshortd16" target="_blank">
+            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" style="width: 150px;">
+        </a>
+    </div>
+
+</body>
+</html>
